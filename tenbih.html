@@ -1,0 +1,447 @@
+ <!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ساعة - كرونومتر - منبه</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    min-height: 100vh;
+    display:flex; flex-direction:column; align-items:center;
+    color:#fff; padding:20px;
+  }
+  h1 { margin-bottom: 20px; font-size: 1.8rem; text-align:center;}
+  .tabs {
+    display:flex; gap:10px; margin-bottom:25px; flex-wrap:wrap; justify-content:center;
+  }
+  .tab-btn {
+    padding:10px 22px; border:none; border-radius:30px;
+    background:rgba(255,255,255,0.1); color:#fff; cursor:pointer;
+    font-size:1rem; transition:.2s;
+  }
+  .tab-btn.active { background:#f6b93b; color:#111; font-weight:bold; }
+  .tab-btn:hover { background:#f6b93b55; }
+
+  .panel { display:none; width:100%; max-width:420px;
+    background:rgba(255,255,255,0.07); border-radius:20px; padding:30px 20px;
+    box-shadow:0 8px 30px rgba(0,0,0,.3); text-align:center;
+  }
+  .panel.active { display:block; }
+
+  /* خط الأرقام الرقمي (ديجيتال) لكل العدادات */
+  .digital {
+    font-family: 'Orbitron', 'Segoe UI', sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Clock */
+  #clock-time { font-size:3rem; font-weight:bold; letter-spacing:2px; }
+  #clock-date { margin-top:10px; font-size:1.1rem; opacity:.8; }
+
+  /* Stopwatch */
+  #sw-display { font-size:2.6rem; font-weight:bold; margin-bottom:20px; }
+  .btn-row { display:flex; justify-content:center; gap:12px; flex-wrap:wrap; }
+  button.action {
+    padding:12px 20px; border:none; border-radius:12px; cursor:pointer;
+    font-size:1rem; font-weight:bold; transition:.2s;
+  }
+  .btn-start { background:#27ae60; color:#fff; }
+  .btn-stop { background:#e74c3c; color:#fff; }
+  .btn-reset { background:#95a5a6; color:#111; }
+  .btn-lap { background:#3498db; color:#fff; }
+  button.action:hover { filter:brightness(1.1); transform:translateY(-1px); }
+  #laps { margin-top:15px; max-height:150px; overflow-y:auto; text-align:right; font-size:.9rem; }
+  #laps div { padding:4px 8px; border-bottom:1px solid rgba(255,255,255,.1); }
+
+  /* Alarm */
+  .alarm-form { display:flex; flex-direction:column; gap:12px; margin-bottom:20px; }
+  .alarm-form input[type="time"], .alarm-form input[type="text"], .alarm-form input[type="date"] {
+    padding:10px; border-radius:10px; border:none; font-size:1rem; text-align:center;
+  }
+  .alarm-form textarea {
+    padding:10px; border-radius:10px; border:none; font-size:1rem; text-align:center;
+    font-family:inherit; resize:vertical;
+  }
+  .file-label {
+    display:block; padding:10px; border-radius:10px;
+    background:rgba(255,255,255,0.12); cursor:pointer; font-size:.95rem;
+  }
+  .file-label:hover { background:rgba(255,255,255,0.2); }
+  #alarm-image { display:none; }
+  #image-preview-wrap { display:none; align-items:center; justify-content:center; gap:10px; }
+  #image-preview-wrap.show { display:flex; }
+  #image-preview { width:46px; height:46px; border-radius:10px; object-fit:cover; border:2px solid #f6b93b; }
+  #image-clear-btn {
+    background:#c0392b; border:none; color:#fff; padding:6px 10px; border-radius:8px; cursor:pointer; font-size:.85rem;
+  }
+  #alarm-list { text-align:right; }
+  .alarm-item {
+    display:flex; justify-content:space-between; align-items:center;
+    background:rgba(255,255,255,0.08); padding:10px 14px; border-radius:10px; margin-bottom:8px;
+  }
+  .alarm-item .digital { font-size:1.05rem; }
+  .alarm-item.ringing { background:#e74c3c; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.5; } }
+  .del-btn { background:#c0392b; border:none; color:#fff; padding:6px 10px; border-radius:8px; cursor:pointer; }
+  .add-btn { background:#f6b93b; color:#111; }
+
+  /* شاشة المنبه النابضة (فلاش) */
+  #ring-overlay {
+    display:none;
+    position:fixed; inset:0;
+    background: rgba(231, 76, 60, 0.92);
+    z-index:999;
+    flex-direction:column; align-items:center; justify-content:center;
+    text-align:center;
+    animation: flash-bg 1s infinite;
+    padding:20px;
+  }
+  #ring-overlay.show { display:flex; }
+  @keyframes flash-bg {
+    0%, 100% { background: rgba(231, 76, 60, 0.92); }
+    50% { background: rgba(120, 20, 15, 0.92); }
+  }
+  .ring-icon {
+    font-size: 7rem;
+    animation: pulse 1s infinite;
+  }
+  .ring-custom-img {
+    width: 200px; height: 200px; max-width:60vw; max-height:60vw;
+    object-fit: cover; border-radius: 20px;
+    border: 4px solid #fff;
+    animation: pulse 1s infinite;
+    box-shadow: 0 0 40px rgba(0,0,0,.4);
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+  }
+  #ring-label { font-size:1.6rem; font-weight:bold; margin-top:20px; }
+  #ring-note { font-size:1.1rem; margin-top:10px; max-width:80%; line-height:1.6; opacity:.95; white-space:pre-wrap; }
+  #ring-time { font-size:1.2rem; opacity:.9; margin-top:6px; }
+  #ring-stop-btn {
+    margin-top:30px; padding:16px 40px; border:none; border-radius:14px;
+    background:#fff; color:#e74c3c; font-size:1.2rem; font-weight:bold; cursor:pointer;
+  }
+  #ring-stop-btn:hover { filter:brightness(0.95); }
+</style>
+</head>
+<body>
+
+<h1>⏰ ساعة | ⏱️ كرونومتر | 🔔 منبه</h1>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="clock">الساعة</button>
+  <button class="tab-btn" data-tab="stopwatch">الكرونومتر</button>
+  <button class="tab-btn" data-tab="alarm">المنبه</button>
+</div>
+
+<!-- CLOCK -->
+<div class="panel active" id="clock">
+  <div id="clock-time">--:--:--</div>
+  <div id="clock-date" class="digital">--</div>
+</div>
+
+<!-- STOPWATCH -->
+<div class="panel" id="stopwatch">
+  <div id="sw-display">00:00:00.00</div>
+  <div class="btn-row">
+    <button class="action btn-start" id="sw-start">ابدأ</button>
+    <button class="action btn-stop" id="sw-stop">إيقاف</button>
+    <button class="action btn-lap" id="sw-lap">شوط</button>
+    <button class="action btn-reset" id="sw-reset">تصفير</button>
+  </div>
+  <div id="laps"></div>
+</div>
+
+<!-- ALARM -->
+<div class="panel" id="alarm">
+  <div class="alarm-form">
+    <input type="time" id="alarm-time">
+    <input type="date" id="alarm-date">
+    <input type="text" id="alarm-label" placeholder="تسمية المنبه (اختياري)">
+    <textarea id="alarm-note" placeholder="نص التنبيه (رسالة تظهر عند الرنين، اختياري)" rows="2"></textarea>
+    <label class="file-label" id="file-label-text" for="alarm-image">🖼️ اختر صورة من جهازك تظهر عند رنين المنبه (اختياري)</label>
+    <input type="file" id="alarm-image" accept="image/*">
+    <div id="image-preview-wrap">
+      <img id="image-preview" src="" alt="معاينة الصورة">
+      <span>سيتم استخدام هذه الصورة لكل المنبهات</span>
+      <button id="image-clear-btn">إزالة</button>
+    </div>
+    <button class="action add-btn" id="alarm-add">إضافة منبه</button>
+  </div>
+  <div id="alarm-list"></div>
+</div>
+
+<!-- شاشة نابضة تظهر عند رنين المنبه -->
+<div id="ring-overlay">
+  <div class="ring-icon" id="ring-icon">🔔</div>
+  <img class="ring-custom-img" id="ring-custom-img" style="display:none;" src="" alt="صورة المنبه">
+  <div id="ring-label">المنبه!</div>
+  <div id="ring-note"></div>
+  <div id="ring-time">--:--</div>
+  <button id="ring-stop-btn">إيقاف المنبه</button>
+</div>
+
+<script>
+/* ---------- التبويبات ---------- */
+const tabs = document.querySelectorAll('.tab-btn');
+const panels = document.querySelectorAll('.panel');
+tabs.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    tabs.forEach(b=>b.classList.remove('active'));
+    panels.forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ---------- الساعة ---------- */
+function updateClock(){
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock-time').textContent = `${h}:${m}:${s}`;
+  const options = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+  document.getElementById('clock-date').textContent = now.toLocaleDateString('ar-EG', options);
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ---------- الكرونومتر ---------- */
+let swInterval = null;
+let swElapsed = 0; // ms
+let swRunning = false;
+let lapCount = 0;
+
+function formatSW(ms){
+  const h = String(Math.floor(ms/3600000)).padStart(2,'0');
+  const m = String(Math.floor((ms%3600000)/60000)).padStart(2,'0');
+  const s = String(Math.floor((ms%60000)/1000)).padStart(2,'0');
+  const cs = String(Math.floor((ms%1000)/10)).padStart(2,'0');
+  return `${h}:${m}:${s}.${cs}`;
+}
+
+const swDisplay = document.getElementById('sw-display');
+
+document.getElementById('sw-start').onclick = ()=>{
+  if(swRunning) return;
+  swRunning = true;
+  const startTime = Date.now() - swElapsed;
+  swInterval = setInterval(()=>{
+    swElapsed = Date.now() - startTime;
+    swDisplay.textContent = formatSW(swElapsed);
+  }, 10);
+};
+
+document.getElementById('sw-stop').onclick = ()=>{
+  swRunning = false;
+  clearInterval(swInterval);
+};
+
+document.getElementById('sw-reset').onclick = ()=>{
+  swRunning = false;
+  clearInterval(swInterval);
+  swElapsed = 0;
+  lapCount = 0;
+  swDisplay.textContent = formatSW(0);
+  document.getElementById('laps').innerHTML = '';
+};
+
+document.getElementById('sw-lap').onclick = ()=>{
+  if(!swRunning) return;
+  lapCount++;
+  const div = document.createElement('div');
+  div.textContent = `شوط ${lapCount}: ${formatSW(swElapsed)}`;
+  document.getElementById('laps').prepend(div);
+};
+
+/* ---------- صوت المنبه (يُولَّد عبر Web Audio API، لا يحتاج ملف صوتي) ---------- */
+let audioCtx = null;
+let beepInterval = null;
+
+function ensureAudioCtx(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if(audioCtx.state === 'suspended'){
+    audioCtx.resume();
+  }
+}
+
+function playBeepOnce(){
+  ensureAudioCtx();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = 880;
+  gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.3, audioCtx.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.35);
+}
+
+function startAlarmSound(){
+  ensureAudioCtx();
+  playBeepOnce();
+  beepInterval = setInterval(playBeepOnce, 600);
+}
+
+function stopAlarmSound(){
+  if(beepInterval){
+    clearInterval(beepInterval);
+    beepInterval = null;
+  }
+}
+
+/* ---------- صورة المنبه المخصّصة (يتم اختيارها من الجهاز) ---------- */
+let customAlarmImage = null; // Data URL
+
+const alarmImageInput = document.getElementById('alarm-image');
+const imagePreviewWrap = document.getElementById('image-preview-wrap');
+const imagePreview = document.getElementById('image-preview');
+const fileLabelText = document.getElementById('file-label-text');
+
+alarmImageInput.addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    customAlarmImage = ev.target.result;
+    imagePreview.src = customAlarmImage;
+    imagePreviewWrap.classList.add('show');
+    fileLabelText.textContent = '🖼️ تم اختيار الصورة (اضغط لتغييرها)';
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('image-clear-btn').onclick = ()=>{
+  customAlarmImage = null;
+  alarmImageInput.value = '';
+  imagePreviewWrap.classList.remove('show');
+  fileLabelText.textContent = '🖼️ اختر صورة من جهازك تظهر عند رنين المنبه (اختياري)';
+};
+
+/* ---------- شاشة الفلاش النابضة ---------- */
+const ringOverlay = document.getElementById('ring-overlay');
+const ringLabel = document.getElementById('ring-label');
+const ringNote = document.getElementById('ring-note');
+const ringTime = document.getElementById('ring-time');
+const ringIcon = document.getElementById('ring-icon');
+const ringCustomImg = document.getElementById('ring-custom-img');
+
+function showRingOverlay(alarm){
+  ringLabel.textContent = alarm.label ? alarm.label : 'المنبه!';
+  ringNote.textContent = alarm.note || '';
+  ringTime.textContent = alarm.date ? `${alarm.time} - ${formatDateShort(alarm.date)}` : alarm.time;
+  if(customAlarmImage){
+    ringCustomImg.src = customAlarmImage;
+    ringCustomImg.style.display = 'block';
+    ringIcon.style.display = 'none';
+  } else {
+    ringCustomImg.style.display = 'none';
+    ringIcon.style.display = 'block';
+  }
+  ringOverlay.classList.add('show');
+}
+
+function hideRingOverlay(){
+  ringOverlay.classList.remove('show');
+}
+
+/* ---------- المنبه ---------- */
+let alarms = [];
+let activeRingingIdx = null;
+
+// يحوّل تاريخ من صيغة YYYY-MM-DD إلى الشكل 15/09/26
+function formatDateShort(isoDate){
+  if(!isoDate) return '';
+  const [y, m, d] = isoDate.split('-');
+  return `${d}/${m}/${y.slice(2)}`;
+}
+
+function renderAlarms(){
+  const list = document.getElementById('alarm-list');
+  list.innerHTML = '';
+  alarms.forEach((a, idx)=>{
+    const div = document.createElement('div');
+    div.className = 'alarm-item' + (a.ringing ? ' ringing' : '');
+    div.innerHTML = `
+      <span>⏰ ${a.time}${a.date ? ' <span class="digital">'+formatDateShort(a.date)+'</span>' : ''} ${a.label ? '- '+a.label : ''}</span>
+      <button class="del-btn" data-idx="${idx}">${a.ringing ? 'إيقاف' : 'حذف'}</button>
+    `;
+    list.appendChild(div);
+  });
+  document.querySelectorAll('.del-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const idx = parseInt(btn.dataset.idx);
+      if(alarms[idx].ringing){
+        stopRinging(idx);
+      } else {
+        alarms.splice(idx,1);
+        renderAlarms();
+      }
+    };
+  });
+}
+
+function stopRinging(idx){
+  alarms[idx].ringing = false;
+  alarms[idx].firedToday = true;
+  stopAlarmSound();
+  hideRingOverlay();
+  activeRingingIdx = null;
+  renderAlarms();
+}
+
+document.getElementById('ring-stop-btn').onclick = ()=>{
+  if(activeRingingIdx !== null){
+    stopRinging(activeRingingIdx);
+  }
+};
+
+document.getElementById('alarm-add').onclick = ()=>{
+  ensureAudioCtx(); // تفعيل الصوت مبكرًا بتفاعل المستخدم (مطلوب من المتصفحات)
+  const time = document.getElementById('alarm-time').value;
+  const date = document.getElementById('alarm-date').value; // اختياري: فارغ يعني يتكرر يوميًا
+  const label = document.getElementById('alarm-label').value;
+  const note = document.getElementById('alarm-note').value;
+  if(!time) return;
+  alarms.push({ time, date: date || null, label, note, ringing:false, firedToday:false });
+  document.getElementById('alarm-time').value = '';
+  document.getElementById('alarm-date').value = '';
+  document.getElementById('alarm-label').value = '';
+  document.getElementById('alarm-note').value = '';
+  renderAlarms();
+};
+
+setInterval(()=>{
+  const now = new Date();
+  const current = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const todayISO = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  const seconds = now.getSeconds();
+  alarms.forEach((a, idx)=>{
+    const dateMatches = !a.date || a.date === todayISO;
+    if(a.time === current && dateMatches && !a.ringing && !a.firedToday && seconds === 0){
+      a.ringing = true;
+      activeRingingIdx = idx;
+      startAlarmSound();
+      showRingOverlay(a);
+      renderAlarms();
+    }
+    if(a.time !== current){
+      a.firedToday = false;
+    }
+  });
+}, 1000);
+</script>
+</body>
+</html>
